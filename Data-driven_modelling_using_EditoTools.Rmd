@@ -4,7 +4,7 @@ author: "Ward Standaert"
 date: "2024-05-22"
 output:
   html_document:
-    css: bootstrap.min.css
+    css: bootstrap.css
     self_contained: false
     toc: true
     toc_float:
@@ -29,7 +29,7 @@ csl: apa.csl
   ```
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = "/home/onyxia/work/EDITO_CALCULATIONS/")
+knitr::opts_knit$set(root.dir = "/home/onyxia/work/HerringDistributionModellingEdito/")
 
 # install and load packages
 pckgs <- c("arrow", "tidyverse", "doParallel", "rasterVis", "mapview", 
@@ -196,7 +196,7 @@ The spatial resolution of environmental variables should match the resolution of
 df_occ_bg <- rbind(df_occs_thinned %>% mutate(presence = 1), 
                    abs %>% mutate(presence = 0))
 
-source("demonstrators/Ward/zarr_extraction/editoTools.R")
+source("editoTools.R")
 options("outputdebug"=NULL)
 
 parameters = list("thetao"= c("par" = "thetao", "fun" = "mean", "buffer" = "18000"),
