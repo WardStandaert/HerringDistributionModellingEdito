@@ -194,7 +194,7 @@ The spatial resolution of environmental variables should match the resolution of
 df_occ_bg <- rbind(df_occs_thinned %>% mutate(presence = 1), 
                    abs %>% mutate(presence = 0))
 
-source("editoTools.R", echo = FALSE)
+source("editoTools.R")
 options("outputdebug"=NULL)
 
 parameters = list("thetao"= c("par" = "thetao", "fun" = "mean", "buffer" = "18000"),
