@@ -751,7 +751,9 @@ getRasterSlice <- function(requestedParameter='thetao', lon_min=-10, lon_max=10,
   
   dbl("extent and coordinate system missing, assuming epsg:4326, extent from stac catalogue")
   crs(r)='epsg:4326'
-  ext(r)=c(zinfo$lonmin[1],zinfo$lonmax[1],zinfo$latmin[1],zinfo$latmax[1])
+  ext(r)=c(zinfo$lonmin[1],zinfo$lonmax[1],
+           min(zinfo$latmin[1],zinfo$latmax[1]),
+           max(zinfo$latmin[1],zinfo$latmax[1]))
   
   r <- crop(r, ext(lon_min, lon_max, lat_min, lat_max))
   
