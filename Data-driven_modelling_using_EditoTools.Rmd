@@ -162,12 +162,11 @@ We will use Maximum entropy (Maxent) models to fit the habitat suitability of he
 
 ```{r step 4}
 set.seed(123)
-#this takes half a minute
+#this takes about half a minute
 abs <- spatiotemp_pseudoabs(spatial.method = "buffer", temporal.method = "random",
                             occ.data = df_occs_thinned %>% mutate(x = Longitude, y = Latitude),
                             temporal.ext = c("2000-01-01", "2020-12-31"), spatial.buffer = 100000,
                             n.pseudoabs = 10000)
-
 glimpse(abs)
 ```
 
@@ -191,12 +190,11 @@ Traditionally, this is proceeded by a cumbersome process of looking for and down
 The spatial resolution of environmental variables should match the resolution of the species records during species distribution modelling [@sillero2021common]. To solve this, environmental maps are traditionally resampled to the same resolution as the species records. The extraction method from .zarr files on EDITO allows the user to provide a buffer. When a buffer is provided, environmental values are not only extracted at the requested longitude, latitude and time coordinate but from all cells within the specified buffer around the location. Next, a user specified function (i.e. mean, max, min, median) is applied to these values to summarize this information into one value for each requested longitude, latitude and time coordinate. This way, an uncertainty is added to the location of the occurrence / (pseudo-)absence / background point. In this example, we apply a buffer of 10 NM, which is the resolution of the occurrence data.
 
 ```{r step 5, results='hide'}
-
 #combine occurrences and background points
 df_occ_bg <- rbind(df_occs_thinned %>% mutate(presence = 1), 
                    abs %>% mutate(presence = 0))
 
-source("editoTools.R")
+source("editoTools.R", echo = FALSE)
 options("outputdebug"=NULL)
 
 parameters = list("thetao"= c("par" = "thetao", "fun" = "mean", "buffer" = "18000"),
@@ -222,28 +220,47 @@ df_occ_bg_env = enhanceDF(inputPoints = df_occ_bg %>%
 
 df_occ_bg_env <- df_occ_bg_env %>% dplyr::select(presence, Longitude, Latitude, year, month,
                                                  thetao, so, zooc, phyc)
-
-# remove observations where no environmental values were present
-df_occ_bg_env <- drop_na(df_occ_bg_env)
-
-# ## TODO remove this part ----
-# substr_lvl <- tibble(sub_char = c("Fine mud", "Sand", "Muddy sand", "Mixed sediment",
-#                                   "Coarse substrate","Sandy mud or Muddy sand", "Seabed",
-#                                   "Rock or other hard substrata","Sandy mud", "Sandy mud or Muddy sand ",
-#                                   "Sediment","Fine mud or Sandy mud or Muddy sand"),
-#                      seabed_substrate = c(1:12))
-# energy_lvl <- tibble(ene_char = c("High energy", "Moderate energy", "Low energy", "No energy information"),
-#                      seabed_energy = c(1:4))
-# 
-# df_occ_bg_env <- df_occ_bg_env %>%
-#   left_join(energy_lvl, by = "seabed_energy") %>%
-#   left_join(substr_lvl, by = "seabed_substrate") %>%
-#   dplyr::select(-seabed_energy, -seabed_substrate) %>%
-#   mutate(windfarms = as.factor(windfarms))
-
 ```
 
-``` {r step 5.2}
+This part shows how to add your own product and sample data from this product. 
+Here I use a downsampled product of elevation, stored in the datalake, to increase computing time.
+
+```{r step 5.2, results='hide'}
+#add the new bathymetry file to the catalog (dataframe called EDITOSTAC that is loaded while sourcing EditoTools.R)
+url <- "https://minio.lab.dive.edito.eu/oidc-willemboone/bathymetry_ward.zarr"
+EDITOSTAC_ed <- EDITOSTAC %>% add_row(par = "elevation",
+                      href = url,
+                      latmin = 40,
+                      latmax = 62,
+                      lonmin = -12,
+                      lonmax = 10,
+                      start_datetime = "1900-01-01",
+                      end_datetime = "3000-01-01",
+                      title = "downsampled_bathymetry",
+                      categories = 0,
+                      catalogue = "EMODNET",
+                      chunktype = "chunked")
+
+parameters = list("elevation"= c("par" = "elevation",
+                                 "fun" = "mean",
+                                 "buffer" = "18000"))
+
+df_occ_bg_env2 = enhanceDF(inputPoints = df_occ_bg_env %>%
+                                mutate(Time = as.POSIXct(paste(year,month,1,sep = "-"))),
+                              requestedParameters = parameters, 
+                              requestedTimeSteps = NA, 
+                              stacCatalogue = EDITOSTAC_ed, 
+                              verbose="on",
+                              atDepth = 20,
+                              select_layers = 2)
+
+df_occ_bg_env2 <- df_occ_bg_env2 %>% dplyr::select(presence, Longitude, Latitude, year, month,
+                                                   thetao, so, zooc, phyc, elevation)
+# remove observations where no environmental values were present
+df_occ_bg_env <- drop_na(df_occ_bg_env2)
+```
+
+``` {r step 5.3}
 table(df_occ_bg_env$presence)
 ```
 
@@ -252,18 +269,16 @@ table(df_occ_bg_env$presence)
 Maxent can be tailored by combining different feature classes and regularization multipliers [@phillips2006modelling]. Fifteen combinations were tested using the corrected Akaike's Information Criterion (AICc) as a selection criterion [@zeng2016novel].
 
 ```{r step 6}
-glimpse(df_occ_bg_env)
-
 # input for ENMevaluate requires lon & lat as first covariates
 
 #test different model settings using ENMeval
-#this takes about 13 mins
+#this takes about 20 mins
 model_fit <- ENMeval::ENMevaluate(occs = df_occ_bg_env %>%                                    
                                     filter(presence == 1) %>% 
-                                    dplyr::select(Longitude, Latitude, thetao, so, zooc, phyc),
+                                    dplyr::select(Longitude, Latitude, thetao, so, zooc, phyc, elevation),
                                   bg = df_occ_bg_env %>% 
                                     filter(presence == 0) %>% 
-                                    dplyr::select(Longitude, Latitude, thetao, so, zooc, phyc),
+                                    dplyr::select(Longitude, Latitude, thetao, so, zooc, phyc, elevation),
                                   tune.args = list(fc = c("L","LQ","LQH"),
                                                    rm = c(1,2,4,8,32)),
                                   algorithm = "maxnet",
@@ -291,12 +306,13 @@ opt.aicc <- eval.results(model_fit) %>% filter(delta.AICc == 0)
 mod <- eval_res@models[[which(names(eval_res@models) == opt.aicc$tune.args)]]
 
 #variables as defined in the model
-vs <- c("thetao", "so", "phyc", "zooc")
+vs <- c("thetao", "so", "phyc", "zooc", "elevation")
 
 #variables names for the plot
-name_key <- data.frame(old = c("thetao", "so", "phyc", "zooc"),
+name_key <- data.frame(old = c("thetao", "so", "phyc", "zooc", "elevation"),
                        new = c("Sea surface temperature (°C)%", "Sea surface salinity (PSU)%", 
-                               "Phytoplankton concentration%(mmol C / m³)", "Zooplankton concentration%(g C / m²)"))
+                               "Phytoplankton concentration%(mmol C / m³)", "Zooplankton concentration%(g C / m²)",
+                               "Depth (m)"))
 
 #function to add a line break at %'s inputs
 addline_format <- function(x,...){
@@ -347,8 +363,9 @@ for (i in 1:nrow(name_key)) {
   }
 }
 
-grid.arrange(grobs = list(thetao, so + xlab(""), 
-                          phyc, zooc + xlab("")))
+grid.arrange(grobs = list(thetao, so + ylab(""), 
+                          phyc, zooc + ylab(""),
+                          elevation))
 ```
 
 # 3. Project model
@@ -360,11 +377,7 @@ Finally, we want to make spatial predictions for the habitat suitability in the 
 First, maps are derived from the .zarr files in the datalake at a given time and between a set of longitude and latitudes (defined by the study area).
 
 ```{r step 8, results='hide'}
-variables <- c("thetao", "so", "phyc", "zooc")
-
-# files <- tibble(name = list.files("data/raster_slices/", pattern = ".tif|.grd", full.names = TRUE),
-#                 parameter = str_extract(name, pattern = paste0(variables, collapse = "|")),
-#                 month = str_extract(name, pattern = "\\d{2}|\\d"))
+variables <- c("thetao", "so", "phyc", "zooc", "elevation")
 
 #get model
 eval_res <- model_fit
@@ -376,14 +389,14 @@ st <- list()
 for (d in 1:4) {
   for (i in 1:length(variables)) {
   raster_list[[i]] <- getRasterSlice(variables[i],
-                                      stacCatalogue = EDITOSTAC,
+                                      stacCatalogue = EDITOSTAC_ed,
                                       lon_min = -12,
                                       lon_max = 10,
                                       lat_min = 48,
                                       lat_max = 62,
                                       requestedTimeSteps = NA,
                                       date = c("2019-09-01", "2019-10-01", "2019-12-01", "2020-01-01")[d],
-                                      select_layers = 1)
+                                      select_layers = c(1,1,1,1,2))
   }
   resolutions <- sapply(raster_list, res, simplify = TRUE)
   coarsest_resolution <- resolutions[, which.max(apply(resolutions, 2,
