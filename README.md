@@ -10,7 +10,7 @@ The different steps from data retrieval to modelling and creating figures are ex
 
 # Getting started
 There are two options:
-- Open the .Rmd file and run the code chunk by chunk for a detailed modelling experience.\
+- Open the .Rmd file and run the code chunk by chunk for a detailed modelling experience.
 - Alternatively, open the prerendered .html file that gives a nice overview of all steps of the modelling.
 
 Happy modelling!
