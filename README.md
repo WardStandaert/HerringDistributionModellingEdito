@@ -2,7 +2,7 @@
 
 This tutorial is a showcase of how Edito can be used to create habitat suitability models.
 The tutorial makes use of EditoTools.R, which contains functions to retrieve data from zarr and parquet files in the data lake.
-For more information on EditoTools.R visit <<[the documentation](https://github.com/WardStandaert/EditoTools_documentation)>>. 
+For more information on EditoTools.R visit [the documentation](https://github.com/WardStandaert/EditoTools_documentation). 
 
 # Tutorial outline
 
