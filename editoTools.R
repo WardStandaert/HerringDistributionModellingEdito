@@ -1,3 +1,15 @@
+#current version: 20/08/2024
+
+# --------------------------------------------------------------------------------
+
+# Developed and owned by Flanders Marine Institute (VLIZ)
+# Please do not change anything in this file
+# For any questions, bugs or requests, please contact francisco.hernandez@vliz.be
+
+# --------------------------------------------------------------------------------
+
+
+#packages
 library(foreach)
 library(doParallel)
 library(stars)
